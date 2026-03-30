@@ -58,7 +58,7 @@ export class BiliBot {
       proxy: opts.proxy ?? undefined,
     } as Required<BiliBotOptions>;
 
-    this.poller = new MessagePoller(creds, { intervalMs: this.opts.pollInterval });
+    this.poller = new MessagePoller(creds, this.opts.pollInterval);
     this.sendQueue = new PQueue({ concurrency: this.opts.sendConcurrency });
 
     // 将轮询事件分发给所有已注册的处理器
@@ -126,7 +126,7 @@ export class BiliBot {
     opts: SendMessageOptions = {}
   ): Promise<unknown> {
     return this.sendQueue.add(() =>
-      Grpc.sendMsg(this.creds, { content: text }, receiverId, 1, opts)
+      Grpc.sendMsg(this.creds, receiverId, { content: text }, 1)
     );
   }
 
@@ -148,14 +148,13 @@ export class BiliBot {
     return this.sendQueue.add(() =>
       Grpc.sendMsg(
         this.creds,
+        receiverId,
         {
           url: uploaded.image_url,
           height: String(uploaded.image_height),
           width: String(uploaded.image_width),
         },
-        receiverId,
-        2,
-        opts
+        2
       )
     );
   }
@@ -177,7 +176,7 @@ export class BiliBot {
    * @param ackSeqno - 已读到的消息序列号。
    */
   async markRead(talkerId: number, ackSeqno: number): Promise<unknown> {
-    return Grpc.markMessagesAsRead(this.creds, talkerId, { ack_seqno: ackSeqno });
+    return Grpc.markMessagesAsRead(this.creds, talkerId, ackSeqno);
   }
 
   // ---------------------------------------------------------------------------
@@ -190,7 +189,7 @@ export class BiliBot {
    * @returns 刷新后的新凭据。
    */
   async refreshToken(): Promise<BiliCredentials> {
-    const newCreds = await refreshToken(this.creds);
+    const newCreds = await refreshToken(this.creds.access_token, this.creds.refresh_token, this.opts.proxy);
     Object.assign(this.creds, newCreds);
     return this.creds;
   }

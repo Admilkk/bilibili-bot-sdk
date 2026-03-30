@@ -171,10 +171,10 @@ export class MessagePoller extends EventEmitter {
   private parseMessage(raw: RawGrpcMsg, talkerId: number): IncomingMessage | null {
     const base = {
       msgKey: String(raw.msg_key),
-      msgSeqno: Number(raw.msg_seqno),
+      seqno: Number(raw.msg_seqno),
       senderId: Number(raw.sender_uid) || talkerId,
+      receiverId: Number(this.creds.DedeUserID),
       timestamp: Number(raw.timestamp),
-      selfId: Number(this.creds.DedeUserID),
     };
 
     let content: Record<string, unknown> = {};

@@ -18,7 +18,7 @@ export { loadCredentialFile, loadCredentialDir } from './manager.js';
 
 // 认证
 export { BiliAuth } from './auth.js';
-export { getTvQrCode, pollTvQrCode, getWebQrCode, pollWebQrCode, refreshToken, parseCookieString } from './auth.js';
+export { getTvQrCode, pollTvQrLogin, getWebQrCode, pollWebQrLogin, refreshToken, parseCookieString } from './auth.js';
 
 // gRPC 层（高级用法）
 export * as Grpc from './grpc.js';

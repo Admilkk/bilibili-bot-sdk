@@ -91,6 +91,8 @@ export interface BaseMessage {
   seqno: string | number;
   /** 服务端时间戳（Unix 秒）。 */
   timestamp: number;
+  /** 消息的纯文本摘要，用于日志/展示。 */
+  rawText: string;
 }
 
 /** 纯文本私信消息。 */

@@ -8,7 +8,7 @@
 
 import axios from 'axios';
 import FormData from 'form-data';
-import imageSize from 'image-size';
+import { imageSize } from 'image-size';
 import type { BiliCredentials, ImageUploadResult } from './types.js';
 
 /** 图片上传接口地址。 */
