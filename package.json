@@ -14,7 +14,8 @@
   "scripts": {
     "build": "tsc",
     "build:watch": "tsc --watch",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "docs": "typedoc --plugin typedoc-plugin-markdown --out docs src/index.ts"
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.13.4",
@@ -30,6 +31,8 @@
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/uuid": "^9.0.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "typedoc": "^0.27.0",
+    "typedoc-plugin-markdown": "^4.0.0"
   }
 }

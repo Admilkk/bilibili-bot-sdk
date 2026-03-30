@@ -16,7 +16,7 @@ import { fileURLToPath } from 'url';
 import protobuf from 'protobufjs';
 import { v4 as uuidv4 } from 'uuid';
 import { generateEid, generateTraceId, generateWebTicket } from './crypto.js';
-import type { BiliCredentials, RawGrpcSession, RawGrpcMsg } from './types.js';
+import type { BiliCredentials, RawGrpcSession, RawGrpcMsg, MessagePayload } from './types.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -118,7 +118,7 @@ async function buildMetadata(
       osver: '12',
     })
   ).finish();
-  metadata.set('x-bili-device-bin', Buffer.from(deviceBuf).toString('base64'));
+  metadata.set('x-bili-device-bin', Buffer.from(deviceBuf));
 
   // 网络信息
   const netRoot = await protobuf.load(path.join(PROTOS_DIR, 'bilibili/metadata/network/network.proto'));
@@ -126,7 +126,7 @@ async function buildMetadata(
   const netBuf = NetworkType.encode(
     NetworkType.create({ type: 2 }) // 2 = WIFI
   ).finish();
-  metadata.set('x-bili-network-bin', Buffer.from(netBuf).toString('base64'));
+  metadata.set('x-bili-network-bin', Buffer.from(netBuf));
 
   // 地区/语言信息
   const locRoot = await protobuf.load(path.join(PROTOS_DIR, 'bilibili/metadata/locale/locale.proto'));
@@ -137,7 +137,7 @@ async function buildMetadata(
       s_locale: { language: 'zh', region: 'CN' },
     })
   ).finish();
-  metadata.set('x-bili-locale-bin', Buffer.from(locBuf).toString('base64'));
+  metadata.set('x-bili-locale-bin', Buffer.from(locBuf));
 
   // 鉴权
   metadata.set('authorization', `identify_v1 ${creds.access_token}`);
@@ -251,7 +251,7 @@ export async function getUserMessages(
 export async function sendMsg(
   creds: BiliCredentials,
   receiverId: number,
-  content: { content?: string; url?: string; height?: string; width?: string },
+  payload: MessagePayload,
   sessionType = 1
 ): Promise<{ msg_key?: string | number }> {
   const client = await getServiceClient(
@@ -259,29 +259,38 @@ export async function sendMsg(
     'bilibili.im.interface.v1.ImInterface'
   );
 
-  const isImage = !!content.url;
-  const msgType = isImage ? 2 : 1; // 1=文本 2=图片
+  let msgType: number;
+  let msgContent: string;
 
-  const msgContent = isImage
-    ? JSON.stringify({
-        url: content.url,
-        height: content.height ?? '0',
-        width: content.width ?? '0',
-        imageType: 2,
-        original: 1,
-        size: 0,
-      })
-    : JSON.stringify({ content: content.content ?? '' });
+  if (payload.type === 'image') {
+    msgType = 2;
+    msgContent = JSON.stringify({
+      url: payload.url,
+      height: String(payload.height ?? 0),
+      width: String(payload.width ?? 0),
+      imageType: payload.imageType ?? 'jpeg',
+      original: payload.original ?? 1,
+      size: payload.size ?? 0,
+    });
+  } else {
+    msgType = 1;
+    msgContent = JSON.stringify({ content: payload.text });
+  }
 
   const req = {
-    sender_uid: Number(creds.DedeUserID),
-    receiver_id: receiverId,
-    receiver_type: sessionType,
-    msg_type: msgType,
-    content: msgContent,
-    timestamp: Math.floor(Date.now() / 1000),
-    dev_id: uuidv4(),
-    new_face_version: 0,
+    msg: {
+      sender_uid: Number(creds.DedeUserID),
+      receiver_id: receiverId,
+      receiver_type: 'EN_RECVER_TYPE_PEER',
+      receiver_type_num: sessionType,
+      msg_type: msgType,
+      content: msgContent,
+      timestamp: Math.floor(Date.now() / 1000),
+      dev_id: uuidv4(),
+      cli_msg_id: Date.now(),
+      msg_seqno: Math.floor(Math.random() * 1_000_000),
+      msg_source: 'EN_MSG_SOURCE_ANDRIOD',
+    },
   };
 
   const meta = await buildMetadata(creds);
@@ -300,14 +309,17 @@ export async function sendMsg(
 export async function markMessagesAsRead(
   creds: BiliCredentials,
   talkerId: number,
-  ackSeqno: number,
-  sessionType = 1
+  options: { ack_seqno?: number; session_type?: number } = {}
 ): Promise<void> {
   const client = await getServiceClient(
     'bilibili/im/interfaces/v1/im.proto',
     'bilibili.im.interface.v1.ImInterface'
   );
-  const req = { talker_id: talkerId, session_type: sessionType, ack_seqno: ackSeqno };
+  const req = {
+    talker_id: talkerId,
+    session_type: options.session_type ?? 1,
+    ack_seqno: options.ack_seqno ?? 0,
+  };
   const meta = await buildMetadata(creds);
   const call = promisify((client as any).UpdateAck.bind(client));
   await call(req, meta);
@@ -331,9 +343,23 @@ export async function recallMsg(
     'bilibili/im/interfaces/v1/im.proto',
     'bilibili.im.interface.v1.ImInterface'
   );
-  const req = { talker_id: talkerId, session_type: sessionType, msg_key: msgKey };
+  // B站撤回消息协议：发送一条 msg_type=5 的特殊消息，content 为目标 msg_key
+  const req = {
+    msg: {
+      sender_uid: Number(creds.DedeUserID),
+      receiver_id: talkerId,
+      receiver_type: 'EN_RECVER_TYPE_PEER',
+      msg_type: 5,
+      content: String(msgKey),
+      timestamp: Math.floor(Date.now() / 1000),
+      dev_id: uuidv4(),
+      cli_msg_id: Date.now(),
+      msg_seqno: Math.floor(Math.random() * 1_000_000),
+      msg_source: 'EN_MSG_SOURCE_ANDRIOD',
+    },
+  };
   const meta = await buildMetadata(creds);
-  const call = promisify((client as any).RecallMsg.bind(client));
+  const call = promisify((client as any).SendMsg.bind(client));
   await call(req, meta);
 }
 

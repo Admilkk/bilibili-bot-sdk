@@ -17,6 +17,7 @@ import type {
   TextMessage,
   ImageMessage,
   ShareMessage,
+  UnknownMessage,
   RawGrpcSession,
   RawGrpcMsg,
 } from './types.js';
@@ -149,14 +150,13 @@ export class MessagePoller extends EventEmitter {
       );
 
       for (const raw of incoming) {
-        const msg = this.parseMessage(raw, talkerId);
-        if (msg) this.emit('message', msg);
+        this.emit('message', this.parseMessage(raw, talkerId));
       }
 
       // 标记已读（ack 到最后一条消息的 seqno）
       const lastSeqno = messages[messages.length - 1]?.msg_seqno;
       if (lastSeqno !== undefined) {
-        await Grpc.markMessagesAsRead(this.creds, talkerId, Number(lastSeqno));
+        await Grpc.markMessagesAsRead(this.creds, talkerId, { ack_seqno: Number(lastSeqno) });
       }
     }
   }
@@ -168,7 +168,7 @@ export class MessagePoller extends EventEmitter {
    * @param talkerId - 会话对方 UID（用于补全 senderId）。
    * @returns 解析后的消息，无法识别类型时返回 `null`。
    */
-  private parseMessage(raw: RawGrpcMsg, talkerId: number): IncomingMessage | null {
+  private parseMessage(raw: RawGrpcMsg, talkerId: number): IncomingMessage {
     const base = {
       msgKey: String(raw.msg_key),
       seqno: Number(raw.msg_seqno),
@@ -187,11 +187,12 @@ export class MessagePoller extends EventEmitter {
     const msgType = Number(raw.msg_type);
 
     if (msgType === EN_MSG_TYPE_TEXT) {
+      const text = (content.content as string) ?? String(raw.content);
       return {
         ...base,
         type: 'text',
-        text: (content.content as string) ?? String(raw.content),
-        rawText: (content.content as string) ?? String(raw.content),
+        text,
+        rawText: text,
       } satisfies TextMessage;
     }
 
@@ -202,23 +203,33 @@ export class MessagePoller extends EventEmitter {
         url: (content.url as string) ?? '',
         width: Number(content.width ?? 0),
         height: Number(content.height ?? 0),
+        imageType: (content.imageType as string) ?? undefined,
+        size: content.size !== undefined ? Number(content.size) : undefined,
         rawText: '[图片]',
       } satisfies ImageMessage;
     }
 
     if (msgType === EN_MSG_TYPE_COMMON_SHARE_CARD || msgType === EN_MSG_TYPE_SHARE_V2) {
+      const title = (content.title as string) ?? '';
       return {
         ...base,
         type: 'share',
-        title: (content.title as string) ?? '',
+        title,
         url: (content.source as string) ?? (content.native_uri as string) ?? '',
-        cover: (content.img_url as string) ?? '',
-        rawText: `[分享] ${(content.title as string) ?? ''}`,
+        cover: (content.img_url as string) ?? undefined,
+        description: (content.desc as string) ?? undefined,
+        rawText: `[分享] ${title}`,
       } satisfies ShareMessage;
     }
 
-    // 未知消息类型，暂不处理
-    return null;
+    // 未知消息类型：不丢弃，以 unknown 类型传递给用户
+    return {
+      ...base,
+      type: 'unknown',
+      msgType,
+      rawContent: String(raw.content),
+      rawText: `[未知消息类型:${msgType}]`,
+    } satisfies UnknownMessage;
   }
 
   private sleep(ms: number): Promise<void> {

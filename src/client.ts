@@ -126,7 +126,7 @@ export class BiliBot {
     opts: SendMessageOptions = {}
   ): Promise<unknown> {
     return this.sendQueue.add(() =>
-      Grpc.sendMsg(this.creds, receiverId, { content: text }, 1)
+      Grpc.sendMsg(this.creds, receiverId, { type: 'text', text })
     );
   }
 
@@ -146,16 +146,12 @@ export class BiliBot {
   ): Promise<unknown> {
     const uploaded = await uploadImage(imageBuffer, this.creds, this.opts.proxy);
     return this.sendQueue.add(() =>
-      Grpc.sendMsg(
-        this.creds,
-        receiverId,
-        {
-          url: uploaded.image_url,
-          height: String(uploaded.image_height),
-          width: String(uploaded.image_width),
-        },
-        2
-      )
+      Grpc.sendMsg(this.creds, receiverId, {
+        type: 'image',
+        url: uploaded.image_url,
+        width: uploaded.image_width,
+        height: uploaded.image_height,
+      })
     );
   }
 
@@ -176,7 +172,7 @@ export class BiliBot {
    * @param ackSeqno - 已读到的消息序列号。
    */
   async markRead(talkerId: number, ackSeqno: number): Promise<unknown> {
-    return Grpc.markMessagesAsRead(this.creds, talkerId, ackSeqno);
+    return Grpc.markMessagesAsRead(this.creds, talkerId, { ack_seqno: ackSeqno });
   }
 
   // ---------------------------------------------------------------------------
@@ -189,8 +185,10 @@ export class BiliBot {
    * @returns 刷新后的新凭据。
    */
   async refreshToken(): Promise<BiliCredentials> {
-    const newCreds = await refreshToken(this.creds.access_token, this.creds.refresh_token, this.opts.proxy);
-    Object.assign(this.creds, newCreds);
+    const res = await refreshToken(this.creds.access_token, this.creds.refresh_token, this.opts.proxy);
+    if (res.code === 0 && res.data) {
+      Object.assign(this.creds, res.data);
+    }
     return this.creds;
   }
 }

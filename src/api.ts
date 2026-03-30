@@ -19,6 +19,12 @@ import type { BiliApiResponse, BiliCredentials } from './types.js';
 // ---------------------------------------------------------------------------
 
 const URLS = {
+  report: 'https://api.bilibili.com/x/v2/history/report',
+  reply: 'https://api.bilibili.com/x/v2/reply/add',
+  unfav: 'https://api.bilibili.com/x/v3/fav/resource/unfav-all',
+  fav: 'https://api.biliapi.net/x/v3/fav/resource/batch-deal',
+  feed: 'https://app.bilibili.com/x/v2/feed/index/story',
+  livefeed: 'https://api.live.bilibili.com/xlive/app-interface/v2/index/feed',
   myinfo: 'https://api.bilibili.com/x/space/myinfo',
   myinfo2: 'https://app.bilibili.com/x/v2/account/myinfo',
   userinfo: 'https://app.bilibili.com/x/v2/account/info',
@@ -339,6 +345,216 @@ export async function getExpReward(
     method: 'GET',
     needSign: false,
     extraHeaders: buildWebHeaders(creds),
+    proxy,
+  });
+}
+
+/**
+ * 上报视频观看进度。
+ *
+ * @param creds - 用户凭据。
+ * @param aid - 视频 av 号。
+ * @param cid - 视频 cid。
+ * @param progress - 观看进度（秒，10~100）。
+ * @param proxy - 可选代理地址。
+ */
+export async function reportWatch(
+  creds: BiliCredentials,
+  aid: number,
+  cid: number,
+  progress = Math.floor(Math.random() * 91) + 10,
+  proxy?: string
+): Promise<BiliApiResponse<unknown>> {
+  const watchTime = Math.min(Math.max(progress, 10), 100);
+  return fetchRequest<BiliApiResponse<unknown>>({
+    url: URLS.report,
+    method: 'POST',
+    params: {
+      ...appBaseParams(creds),
+      mobi_app: 'android_i',
+      aid,
+      cid,
+      progress: watchTime,
+      scene: 'front',
+      type: '3',
+    },
+    proxy,
+  });
+}
+
+/**
+ * 评论视频。
+ *
+ * @param creds - 用户凭据。
+ * @param aid - 视频 av 号。
+ * @param message - 评论内容。
+ * @param proxy - 可选代理地址。
+ */
+export async function replyVideo(
+  creds: BiliCredentials,
+  aid: number,
+  message: string,
+  proxy?: string
+): Promise<BiliApiResponse<unknown>> {
+  return fetchRequest<BiliApiResponse<unknown>>({
+    url: URLS.reply,
+    method: 'POST',
+    params: {
+      ...appBaseParams(creds),
+      oid: aid,
+      message,
+      type: '1',
+      plat: '2',
+      ordering: 'heat',
+      scene: 'main',
+      goto: 'vertical_av',
+      spmid: 'main.ugc-video-detail-vertical.0.0',
+      from_spmid: 'tm.recommend.0.0',
+      has_vote_option: 'false',
+      sync_to_dynamic: 'false',
+    },
+    proxy,
+  });
+}
+
+/**
+ * 取消收藏视频。
+ *
+ * @param creds - 用户凭据。
+ * @param aid - 视频 av 号。
+ * @param proxy - 可选代理地址。
+ */
+export async function unfavVideo(
+  creds: BiliCredentials,
+  aid: number,
+  proxy?: string
+): Promise<BiliApiResponse<unknown>> {
+  return fetchRequest<BiliApiResponse<unknown>>({
+    url: URLS.unfav,
+    method: 'POST',
+    params: {
+      ...appBaseParams(creds),
+      rid: aid,
+      type: 2,
+    },
+    proxy,
+  });
+}
+
+/**
+ * 收藏视频。
+ *
+ * @param creds - 用户凭据。
+ * @param aid - 视频 av 号。
+ * @param proxy - 可选代理地址。
+ */
+export async function favVideo(
+  creds: BiliCredentials,
+  aid: number,
+  proxy?: string
+): Promise<BiliApiResponse<unknown>> {
+  return fetchRequest<BiliApiResponse<unknown>>({
+    url: URLS.fav,
+    method: 'POST',
+    params: {
+      ...appBaseParams(creds),
+      resources: `${aid}:2`,
+      add_media_ids: '0',
+      del_media_ids: '',
+      from: '',
+      extra: JSON.stringify({ item_id: aid, from_spmid: 'tm.recommend.0.0', spmid: 'main.ugc-video-detail-vertical.0.0', goto: 'vertical_av' }),
+    },
+    proxy,
+  });
+}
+
+/**
+ * 获取推荐视频流。
+ *
+ * @param creds - 用户凭据。
+ * @param proxy - 可选代理地址。
+ */
+export async function getFeed(
+  creds: BiliCredentials,
+  proxy?: string
+): Promise<BiliApiResponse<unknown>> {
+  return fetchRequest<BiliApiResponse<unknown>>({
+    url: URLS.feed,
+    method: 'GET',
+    params: {
+      ...appBaseParams(creds),
+      pull: '1',
+      fnval: '912',
+      fnver: '0',
+      force_host: '0',
+      fourk: '1',
+      from: '6',
+      qn: '32',
+      network: 'wifi',
+      display_id: '1',
+      request_from: '1',
+      video_mode: '1',
+      voice_balance: '1',
+    },
+    proxy,
+  });
+}
+
+/**
+ * 获取直播推荐流。
+ *
+ * @param creds - 用户凭据。
+ * @param proxy - 可选代理地址。
+ */
+export async function getLiveFeed(
+  creds: BiliCredentials,
+  proxy?: string
+): Promise<BiliApiResponse<unknown>> {
+  return fetchRequest<BiliApiResponse<unknown>>({
+    url: URLS.livefeed,
+    method: 'GET',
+    params: {
+      ...appBaseParams(creds),
+      actionKey: 'appkey',
+      device: 'android',
+      is_refresh: '0',
+      login_event: '1',
+      module_select: '0',
+      network: 'wifi',
+      out_ad_name: '',
+      page: '1',
+      qn: '0',
+      relation_page: '1',
+      scale: 'hdpi',
+      version: '8.2.0',
+    },
+    proxy,
+  });
+}
+
+/**
+ * 点踩视频。
+ *
+ * @param creds - 用户凭据。
+ * @param aid - 视频 AV 号。
+ * @param proxy - 可选代理地址。
+ */
+export async function dislikeVideo(
+  creds: BiliCredentials,
+  aid: number,
+  proxy?: string
+): Promise<BiliApiResponse<unknown>> {
+  return fetchRequest<BiliApiResponse<unknown>>({
+    url: URLS.dislike,
+    method: 'POST',
+    params: {
+      ...appBaseParams(creds),
+      aid,
+      dislike: '0',
+      from: '7',
+      from_spmid: 'tm.recommend.0.0',
+      spmid: 'united.player-video-detail.0.0',
+    },
     proxy,
   });
 }

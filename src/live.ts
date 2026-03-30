@@ -11,13 +11,15 @@
  */
 
 import { fetchRequest, buildWebHeaders } from './http.js';
+import { generateEid, generateTraceId, generateWebTicket } from './crypto.js';
 import type { BiliApiResponse, BiliCredentials } from './types.js';
 
 // ---------------------------------------------------------------------------
 // 接口地址
 // ---------------------------------------------------------------------------
 
-const SEND_DANMU_URL = 'https://api.live.bilibili.com/xlive/app-room/v1/dM/sendmsg';
+const LIVE_SHARE_URL = 'https://api.live.bilibili.com/xlive/app-room/v1/index/TrigerInteract';
+const SEND_DANMU_URL ='https://api.live.bilibili.com/xlive/app-room/v1/dM/sendmsg';
 const GET_ROOM_INFO_URL = 'https://api.live.bilibili.com/xlive/app-room/v1/index/getInfoByRoom';
 const LIKE_ROOM_URL = 'https://api.live.bilibili.com/xlive/app-ucenter/v1/like_info_v3/like/likeReportV3';
 const GET_DANMU_HISTORY_URL = 'https://api.live.bilibili.com/xlive/app-room/v1/dM/gethistory';
@@ -58,6 +60,31 @@ export interface DanmuRecord {
 }
 
 // ---------------------------------------------------------------------------
+// 内部辅助
+// ---------------------------------------------------------------------------
+
+const BUVID = 'XU4C85241BF18FBC9C5C20CA1D08F38937711';
+const FP = 'ce14fc8255de098acb8c4f83e245543820250121175935cc89db065489232e72';
+
+async function buildAppHeaders(creds: BiliCredentials): Promise<Record<string, string>> {
+  const ticket = await generateWebTicket(creds);
+  return {
+    'User-Agent': 'Mozilla/5.0 BiliDroid/8.2.0 (bbcallen@gmail.com) os/android model/NTH-AN00 mobi_app/android build/8020300 channel/yingyongbao innerVer/8020300 osVer/12 network/2',
+    'Content-Type': 'application/x-www-form-urlencoded',
+    buvid: BUVID,
+    fp_local: FP,
+    fp_remote: FP,
+    session_id: '3d5cec47',
+    guestid: '24145498840755',
+    'x-bili-mid': creds.DedeUserID,
+    'x-bili-ticket': ticket?.ticket ?? '',
+    'x-bili-aurora-eid': generateEid(creds.DedeUserID),
+    'x-bili-trace-id': generateTraceId(),
+    'app-key': 'android',
+  };
+}
+
+// ---------------------------------------------------------------------------
 // 公共 API
 // ---------------------------------------------------------------------------
 
@@ -94,31 +121,41 @@ export async function sendDanmu(
     access_key: creds.access_token,
     actionKey: 'appkey',
     appkey: '1d8b6e7d45233436',
-    build: '8020300',
+    build: '7750600',
     c_locale: 'zh_CN',
-    channel: 'yingyongbao',
+    channel: 'master',
     device: 'android',
-    disable_rcmd: 0,
-    mobi_app: 'android',
+    disable_rcmd: '0',
+    mobi_app: 'android_i',
     platform: 'android',
     s_locale: 'zh_CN',
     statistics: JSON.stringify({ appId: 1, platform: 3, version: '8.2.0', abtest: '' }),
     ts: Math.floor(Date.now() / 1000),
   };
   const bodyParams = {
-    roomid: roomId,
+    cid: roomId,
     msg: message,
     color: options.color ?? 16777215,
     fontsize: options.fontsize ?? 25,
     mode: options.mode ?? 1,
     rnd: Math.floor(Date.now() / 1000),
-    csrf: creds.csrf,
+    bubble: 0,
+    msg_type: 0,
+    room_type: 0,
+    dm_type: 0,
+    pool: 0,
+    type: 'json',
+    av_id: -99998,
+    reply_attr: 0,
+    reply_mid: 0,
+    jumpfrom: 24000,
   };
   return fetchRequest<BiliApiResponse<unknown>>({
     url: SEND_DANMU_URL,
     method: 'POST',
     params: params as unknown as Record<string, string | number>,
     bodyParams: bodyParams as unknown as Record<string, string | number>,
+    extraHeaders: await buildAppHeaders(creds),
     proxy: options.proxy,
   });
 }
@@ -268,4 +305,43 @@ export async function getUserLiveInfo(
       proxy,
     }
   );
+}
+
+/**
+ * 触发直播间分享互动（获取经验）。
+ *
+ * @param creds - 用户凭据。
+ * @param roomId - 直播间房间号。
+ * @param proxy - 可选代理地址。
+ */
+export async function liveShare(
+  creds: BiliCredentials,
+  roomId: number,
+  proxy?: string
+): Promise<BiliApiResponse<unknown>> {
+  const appHeaders = await buildAppHeaders(creds);
+  return fetchRequest<BiliApiResponse<unknown>>({
+    url: LIVE_SHARE_URL,
+    method: 'POST',
+    params: {
+      access_key: creds.access_token,
+      actionKey: 'appkey',
+      appkey: '1d8b6e7d45233436',
+      build: '7750600',
+      c_locale: 'zh_CN',
+      channel: 'master',
+      device: 'android',
+      disable_rcmd: '0',
+      interact_type: '3',
+      mobi_app: 'android_i',
+      platform: 'android',
+      roomid: roomId,
+      s_locale: 'zh_CN',
+      statistics: JSON.stringify({ appId: 1, platform: 3, version: '8.2.0', abtest: '' }),
+      ts: Math.floor(Date.now() / 1000),
+      version: '8.2.0',
+    } as unknown as Record<string, string | number>,
+    extraHeaders: appHeaders,
+    proxy,
+  });
 }

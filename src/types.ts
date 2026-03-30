@@ -76,7 +76,7 @@ export interface BiliApiResponse<T = unknown> {
 }
 
 // ---------------------------------------------------------------------------
-// 消息类型
+// 消息类型（接收侧）
 // ---------------------------------------------------------------------------
 
 /** 所有私信消息的公共基础字段。 */
@@ -111,6 +111,10 @@ export interface ImageMessage extends BaseMessage {
   width: number;
   /** 图片高度（像素）。 */
   height: number;
+  /** 图片格式（如 `'jpeg'`）。 */
+  imageType?: string;
+  /** 图片文件大小（字节）。 */
+  size?: number;
 }
 
 /** 分享卡片私信消息（视频、直播间等）。 */
@@ -122,10 +126,73 @@ export interface ShareMessage extends BaseMessage {
   url: string;
   /** 封面图 URL（可选）。 */
   cover?: string;
+  /** 分享描述（可选）。 */
+  description?: string;
+}
+
+/**
+ * 未知类型私信消息。
+ *
+ * 当收到 SDK 尚未支持的消息类型时，不丢弃而是以此类型传递，
+ * 让业务层自行决定是否处理。
+ */
+export interface UnknownMessage extends BaseMessage {
+  type: 'unknown';
+  /** 原始 B站消息类型编号。 */
+  msgType: number;
+  /** 原始消息 content 字段（未解析的字符串）。 */
+  rawContent: string;
 }
 
 /** 联合类型：所有可能收到的私信消息。 */
-export type IncomingMessage = TextMessage | ImageMessage | ShareMessage;
+export type IncomingMessage = TextMessage | ImageMessage | ShareMessage | UnknownMessage;
+
+// ---------------------------------------------------------------------------
+// 消息发送 Payload（发送侧）
+// ---------------------------------------------------------------------------
+
+/**
+ * 发送文本私信的 payload。
+ *
+ * @example
+ * ```ts
+ * bot.sendMsg(userId, { type: 'text', text: 'Hello!' });
+ * ```
+ */
+export interface TextPayload {
+  type: 'text';
+  /** 文本内容。 */
+  text: string;
+}
+
+/**
+ * 发送图片私信的 payload。
+ *
+ * SDK 内部自动将此结构转换为 B站协议所需的 JSON 格式。
+ *
+ * @example
+ * ```ts
+ * bot.sendMsg(userId, { type: 'image', url: 'https://...', width: 800, height: 600 });
+ * ```
+ */
+export interface ImagePayload {
+  type: 'image';
+  /** 图片 HTTPS URL（需提前上传到 BFS，可用 {@link uploadImage} 获取）。 */
+  url: string;
+  /** 图片宽度（像素，可选）。 */
+  width?: number;
+  /** 图片高度（像素，可选）。 */
+  height?: number;
+  /** 图片格式，默认 `'jpeg'`。 */
+  imageType?: string;
+  /** 是否发送原图，`1` 为是（默认），`0` 为否。 */
+  original?: 0 | 1;
+  /** 图片文件大小（字节，可选）。 */
+  size?: number;
+}
+
+/** 可发送的消息 payload 联合类型。 */
+export type MessagePayload = TextPayload | ImagePayload;
 
 // ---------------------------------------------------------------------------
 // Bot 配置
@@ -135,79 +202,29 @@ export type IncomingMessage = TextMessage | ImageMessage | ShareMessage;
  * {@link BiliBot} 构造函数选项。
  */
 export interface BiliBotOptions {
-  /**
-   * 轮询间隔（毫秒）。
-   * @defaultValue 3000
-   */
+  /** 轮询间隔（毫秒），默认 `3000`。 */
   pollInterval?: number;
-  /**
-   * 发送消息队列的最大并发数。
-   * @defaultValue 3
-   */
+  /** 并发发送队列大小，默认 `3`。 */
   sendConcurrency?: number;
-  /**
-   * 是否在令牌过期时自动刷新。
-   * @defaultValue true
-   */
+  /** 是否在 token 过期时自动刷新，默认 `true`。 */
   autoRefreshToken?: boolean;
-  /** HTTP 代理地址（如 `http://127.0.0.1:7890`）。 */
+  /** HTTP 代理地址（如 `'http://127.0.0.1:7890'`）。 */
+  proxy?: string;
+}
+
+/**
+ * 发送消息时的可选参数。
+ * @deprecated 已由 {@link MessagePayload} 替代，此接口保留用于向后兼容。
+ */
+export interface SendMessageOptions {
+  /** HTTP 代理地址。 */
   proxy?: string;
 }
 
 /**
  * 消息处理回调函数类型。
- *
- * @param msg - 收到的私信消息。
  */
-export type MessageHandler = (msg: IncomingMessage) => void | Promise<void>;
-
-/**
- * {@link BiliBot.sendText} / {@link BiliBot.sendImage} 的可选参数。
- */
-export interface SendMessageOptions {
-  /**
-   * gRPC 会话类型。
-   * - `1`：用户私信（默认）
-   * - `2`：应援团消息
-   */
-  sessionType?: number;
-}
-
-// ---------------------------------------------------------------------------
-// 直播间
-// ---------------------------------------------------------------------------
-
-/**
- * 直播间基本信息。
- */
-export interface LiveRoomInfo {
-  /** 直播间 ID（房间号）。 */
-  room_id: number;
-  /** 主播 UID。 */
-  uid: number;
-  /** 直播间标题。 */
-  title: string;
-  /** 当前直播状态：1=直播中，0=未开播，2=轮播。 */
-  live_status: number;
-  /** 开播时间（Unix 时间戳，未开播时为 0）。 */
-  live_time: number;
-  /** 直播间封面 URL。 */
-  cover: string;
-  /** 在线人数。 */
-  online: number;
-}
-
-/**
- * 发送直播弹幕的参数。
- */
-export interface SendDanmakuOptions {
-  /** 弹幕颜色（十进制，默认白色 16777215）。 */
-  color?: number;
-  /** 弹幕字号（默认 25）。 */
-  fontsize?: number;
-  /** 弹幕模式（1=滚动，默认 1）。 */
-  mode?: number;
-}
+export type MessageHandler = (msg: IncomingMessage) => Promise<void> | void;
 
 // ---------------------------------------------------------------------------
 // gRPC 原始类型（内部使用）
