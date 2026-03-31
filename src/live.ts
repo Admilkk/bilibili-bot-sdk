@@ -314,6 +314,37 @@ export async function getUserLiveInfo(
  * @param roomId - 直播间房间号。
  * @param proxy - 可选代理地址。
  */
+/**
+ * 获取推荐直播列表。
+ *
+ * @param creds - 用户凭据。
+ * @param proxy - 可选代理。
+ */
+export async function getLiveRecommend(
+  creds: BiliCredentials,
+  proxy?: string
+): Promise<BiliApiResponse<unknown>> {
+  const appHeaders = await buildAppHeaders(creds);
+  return fetchRequest<BiliApiResponse<unknown>>({
+    url: 'https://api.live.bilibili.com/xlive/app-interface/v2/index/feed',
+    method: 'GET',
+    params: {
+      access_key: creds.access_token,
+      actionKey: 'appkey',
+      appkey: '1d8b6e7d45233436',
+      build: '7750600',
+      channel: 'master',
+      device: 'android',
+      mobi_app: 'android_i',
+      platform: 'android',
+      scale: 'xxhdpi',
+      ts: Math.floor(Date.now() / 1000),
+    } as unknown as Record<string, string | number>,
+    extraHeaders: appHeaders,
+    proxy,
+  });
+}
+
 export async function liveShare(
   creds: BiliCredentials,
   roomId: number,

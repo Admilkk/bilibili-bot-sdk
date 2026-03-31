@@ -247,3 +247,43 @@ export async function searchVideo(
     proxy: options.proxy,
   });
 }
+
+/**
+ * 获取视频排行榜。
+ *
+ * @param rid - 分区 ID（0=全站，详见 B站分区列表）。
+ * @param proxy - 可选代理。
+ */
+export async function getVideoRanking(
+  rid = 0,
+  proxy?: string
+): Promise<BiliApiResponse<{ list: unknown[] }>> {
+  return fetchRequest({
+    url: 'https://api.bilibili.com/x/web-interface/ranking/v2',
+    method: 'GET',
+    params: { rid, type: 'all' },
+    needSign: false,
+    proxy,
+  });
+}
+
+/**
+ * 获取全站热门视频列表。
+ *
+ * @param pn - 页码（默认 1）。
+ * @param ps - 每页数量（默认 20，最大 100）。
+ * @param proxy - 可选代理。
+ */
+export async function getPopularVideos(
+  pn = 1,
+  ps = 20,
+  proxy?: string
+): Promise<BiliApiResponse<{ list: unknown[]; no_more: boolean }>> {
+  return fetchRequest({
+    url: 'https://api.bilibili.com/x/web-interface/popular',
+    method: 'GET',
+    params: { pn, ps },
+    needSign: false,
+    proxy,
+  });
+}

@@ -12,6 +12,12 @@ import * as Grpc from './grpc.js';
 import * as LiveApi from './live.js';
 import * as VideoApi from './video.js';
 import * as ApiModule from './api.js';
+import * as UserApi from './user.js';
+import * as DynamicApi from './dynamic.js';
+import * as CommentApi from './comment.js';
+import * as FavApi from './fav.js';
+import * as HistoryApi from './history.js';
+import * as SearchApi from './search.js';
 import { uploadImage } from './media.js';
 import { refreshToken } from './auth.js';
 import type {
@@ -77,6 +83,18 @@ export class BiliBot {
    * ```
    */
   readonly api: BotApiFacade;
+  /** 用户信息相关 API，凭据已绑定。 */
+  readonly user: BotUserFacade;
+  /** 动态相关 API，凭据已绑定。 */
+  readonly dynamic: BotDynamicFacade;
+  /** 评论相关 API，凭据已绑定。 */
+  readonly comment: BotCommentFacade;
+  /** 收藏夹相关 API，凭据已绑定。 */
+  readonly fav: BotFavFacade;
+  /** 历史记录 & 稍后再看 API，凭据已绑定。 */
+  readonly history: BotHistoryFacade;
+  /** 搜索相关 API，凭据已绑定。 */
+  readonly search: BotSearchFacade;
 
   private readonly opts: Required<BiliBotOptions>;
   private readonly poller: MessagePoller;
@@ -97,6 +115,12 @@ export class BiliBot {
     this.live = new BotLiveFacade(creds, this.opts.proxy);
     this.video = new BotVideoFacade(creds, this.opts.proxy);
     this.api = new BotApiFacade(creds, this.opts.proxy);
+    this.user = new BotUserFacade(creds, this.opts.proxy);
+    this.dynamic = new BotDynamicFacade(creds, this.opts.proxy);
+    this.comment = new BotCommentFacade(creds, this.opts.proxy);
+    this.fav = new BotFavFacade(creds, this.opts.proxy);
+    this.history = new BotHistoryFacade(creds, this.opts.proxy);
+    this.search = new BotSearchFacade(creds, this.opts.proxy);
     this.sendQueue = new PQueue({ concurrency: this.opts.sendConcurrency });
 
     // 将轮询事件分发给所有已注册的处理器
@@ -300,4 +324,56 @@ export class BotApiFacade {
   favVideo(aid: number) { return ApiModule.favVideo(this.creds, aid, this.proxy); }
   getFeed(options?: Parameters<typeof ApiModule.getFeed>[1]) { return ApiModule.getFeed(this.creds, options); }
   getLiveFeed(options?: Parameters<typeof ApiModule.getLiveFeed>[1]) { return ApiModule.getLiveFeed(this.creds, options); }
+}
+
+/** 用户信息 API facade。 */
+export class BotUserFacade {
+  constructor(private readonly creds: BiliCredentials, private readonly proxy?: string) {}
+  getUserInfo(uid: number) { return UserApi.getUserInfo(uid, this.creds, this.proxy); }
+  getFollowers(vmid: number, pn?: number, ps?: number) { return UserApi.getFollowers(vmid, pn, ps, this.creds, this.proxy); }
+  getFollowings(vmid: number, pn?: number, ps?: number) { return UserApi.getFollowings(vmid, pn, ps, this.creds, this.proxy); }
+  getUserRelation(mid: number) { return UserApi.getUserRelation(mid, this.creds, this.proxy); }
+}
+
+/** 动态 API facade。 */
+export class BotDynamicFacade {
+  constructor(private readonly creds: BiliCredentials, private readonly proxy?: string) {}
+  getDynamicList(options?: Parameters<typeof DynamicApi.getDynamicList>[1]) { return DynamicApi.getDynamicList(this.creds, options, this.proxy); }
+  getUserDynamicList(uid: number, options?: { offset?: string }) { return DynamicApi.getUserDynamicList(uid, this.creds, options, this.proxy); }
+  deleteDynamic(dynamicId: string) { return DynamicApi.deleteDynamic(this.creds, dynamicId, this.proxy); }
+}
+
+/** 评论 API facade。 */
+export class BotCommentFacade {
+  constructor(private readonly creds: BiliCredentials, private readonly proxy?: string) {}
+  getComments(oid: number, type: CommentApi.CommentType, options?: Parameters<typeof CommentApi.getComments>[2]) { return CommentApi.getComments(oid, type, options, this.creds, this.proxy); }
+  sendComment(oid: number, type: CommentApi.CommentType, message: string, options?: Parameters<typeof CommentApi.sendComment>[4]) { return CommentApi.sendComment(this.creds, oid, type, message, options, this.proxy); }
+  likeComment(oid: number, type: CommentApi.CommentType, rpid: number, action?: 0 | 1) { return CommentApi.likeComment(this.creds, oid, type, rpid, action, this.proxy); }
+  deleteComment(oid: number, type: CommentApi.CommentType, rpid: number) { return CommentApi.deleteComment(this.creds, oid, type, rpid, this.proxy); }
+}
+
+/** 收藏夹 API facade。 */
+export class BotFavFacade {
+  constructor(private readonly creds: BiliCredentials, private readonly proxy?: string) {}
+  getFavFolderInfo(mediaId: number) { return FavApi.getFavFolderInfo(mediaId, this.creds, this.proxy); }
+  getFavFolderList(uid: number) { return FavApi.getFavFolderList(uid, this.creds, this.proxy); }
+  getFavFolderContent(mediaId: number, options?: Parameters<typeof FavApi.getFavFolderContent>[1]) { return FavApi.getFavFolderContent(mediaId, options, this.creds, this.proxy); }
+}
+
+/** 历史记录 & 稍后再看 API facade。 */
+export class BotHistoryFacade {
+  constructor(private readonly creds: BiliCredentials, private readonly proxy?: string) {}
+  getHistory(options?: Parameters<typeof HistoryApi.getHistory>[1]) { return HistoryApi.getHistory(this.creds, options, this.proxy); }
+  deleteHistory(kid: string) { return HistoryApi.deleteHistory(this.creds, kid, this.proxy); }
+  getToView() { return HistoryApi.getToView(this.creds, this.proxy); }
+  addToView(aid: number) { return HistoryApi.addToView(this.creds, aid, this.proxy); }
+  deleteToView(aid: number) { return HistoryApi.deleteToView(this.creds, aid, this.proxy); }
+}
+
+/** 搜索 API facade。 */
+export class BotSearchFacade {
+  constructor(private readonly creds: BiliCredentials, private readonly proxy?: string) {}
+  searchAll(keyword: string) { return SearchApi.searchAll(keyword, this.creds, this.proxy); }
+  searchByType(keyword: string, searchType: SearchApi.SearchType, options?: Parameters<typeof SearchApi.searchByType>[2]) { return SearchApi.searchByType(keyword, searchType, options, this.creds, this.proxy); }
+  getHotSearch() { return SearchApi.getHotSearch(this.proxy); }
 }

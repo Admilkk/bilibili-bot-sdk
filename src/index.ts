@@ -9,7 +9,7 @@
  */
 
 // 主客户端
-export { BiliBot, BotLiveFacade, BotVideoFacade, BotApiFacade } from './client.js';
+export { BiliBot, BotLiveFacade, BotVideoFacade, BotApiFacade, BotUserFacade, BotDynamicFacade, BotCommentFacade, BotFavFacade, BotHistoryFacade, BotSearchFacade } from './client.js';
 
 // 多账号管理器
 export { BiliBotManager } from './manager.js';
@@ -33,6 +33,24 @@ export * as Live from './live.js';
 // 视频 API
 export * as Video from './video.js';
 export type { VideoInfo, DashStream, PlayUrlData } from './video.js';
+
+// 用户信息 API
+export * as User from './user.js';
+
+// 动态 API
+export * as Dynamic from './dynamic.js';
+
+// 评论 API
+export * as Comment from './comment.js';
+
+// 收藏夹 API
+export * as Fav from './fav.js';
+
+// 历史记录 & 稍后再看 API
+export * as History from './history.js';
+
+// 搜索 API
+export * as Search from './search.js';
 
 // 媒体上传
 export { uploadImage } from './media.js';
