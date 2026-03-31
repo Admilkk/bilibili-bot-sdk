@@ -9,6 +9,9 @@
 import PQueue from 'p-queue';
 import { MessagePoller } from './polling.js';
 import * as Grpc from './grpc.js';
+import * as LiveApi from './live.js';
+import * as VideoApi from './video.js';
+import * as ApiModule from './api.js';
 import { uploadImage } from './media.js';
 import { refreshToken } from './auth.js';
 import type {
@@ -43,6 +46,38 @@ export class BiliBot {
   /** 当前 Bot 使用的凭据（只读）。 */
   readonly creds: BiliCredentials;
 
+  /**
+   * 直播间相关 API，凭据已绑定，无需手动传入。
+   *
+   * @example
+   * ```ts
+   * await bot.live.sendDanmu(roomId, '你好');
+   * const info = await bot.live.getRoomInfo(roomId);
+   * ```
+   */
+  readonly live: BotLiveFacade;
+
+  /**
+   * 视频相关 API，凭据已绑定，无需手动传入。
+   *
+   * @example
+   * ```ts
+   * const info = await bot.video.getVideoInfo({ bvid: 'BV1xx...' });
+   * ```
+   */
+  readonly video: BotVideoFacade;
+
+  /**
+   * 通用 REST API，凭据已绑定，无需手动传入。
+   *
+   * @example
+   * ```ts
+   * await bot.api.likeVideo(aid);
+   * await bot.api.followUser(uid);
+   * ```
+   */
+  readonly api: BotApiFacade;
+
   private readonly opts: Required<BiliBotOptions>;
   private readonly poller: MessagePoller;
   private readonly sendQueue: PQueue;
@@ -59,6 +94,9 @@ export class BiliBot {
     } as Required<BiliBotOptions>;
 
     this.poller = new MessagePoller(creds, this.opts.pollInterval);
+    this.live = new BotLiveFacade(creds, this.opts.proxy);
+    this.video = new BotVideoFacade(creds, this.opts.proxy);
+    this.api = new BotApiFacade(creds, this.opts.proxy);
     this.sendQueue = new PQueue({ concurrency: this.opts.sendConcurrency });
 
     // 将轮询事件分发给所有已注册的处理器
@@ -191,4 +229,75 @@ export class BiliBot {
     }
     return this.creds;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Facade 类：绑定凭据，简化调用
+// ---------------------------------------------------------------------------
+
+/** 直播间 API facade，由 {@link BiliBot} 自动创建并绑定凭据。 */
+export class BotLiveFacade {
+  constructor(private readonly creds: BiliCredentials, private readonly proxy?: string) {}
+
+  sendDanmu(roomId: number, message: string, options?: Parameters<typeof LiveApi.sendDanmu>[3]) {
+    return LiveApi.sendDanmu(this.creds, roomId, message, options);
+  }
+  getRoomInfo(roomId: number) {
+    return LiveApi.getRoomInfo(this.creds, roomId, this.proxy);
+  }
+  likeLiveRoom(roomId: number, clickCount = 1) {
+    return LiveApi.likeLiveRoom(this.creds, roomId, clickCount, this.proxy);
+  }
+  getDanmuHistory(roomId: number) {
+    return LiveApi.getDanmuHistory(this.creds, roomId, this.proxy);
+  }
+  getUserLiveInfo(uid: number) {
+    return LiveApi.getUserLiveInfo(uid, this.creds, this.proxy);
+  }
+  liveShare(roomId: number) {
+    return LiveApi.liveShare(this.creds, roomId, this.proxy);
+  }
+}
+
+/** 视频 API facade，由 {@link BiliBot} 自动创建并绑定凭据。 */
+export class BotVideoFacade {
+  constructor(private readonly creds: BiliCredentials, private readonly proxy?: string) {}
+
+  getVideoInfo(idOrBvid: string | number) {
+    return VideoApi.getVideoInfo(idOrBvid, this.creds, this.proxy);
+  }
+  getVideoDetail(aid: number) {
+    return VideoApi.getVideoDetail(aid, this.creds, this.proxy);
+  }
+  getPlayUrl(aid: number, cid: number, options?: Parameters<typeof VideoApi.getPlayUrl>[3]) {
+    return VideoApi.getPlayUrl(this.creds, aid, cid, options);
+  }
+  searchVideo(keyword: string, options?: Parameters<typeof VideoApi.searchVideo>[2]) {
+    return VideoApi.searchVideo(this.creds, keyword, options);
+  }
+}
+
+/** 通用 REST API facade，由 {@link BiliBot} 自动创建并绑定凭据。 */
+export class BotApiFacade {
+  constructor(private readonly creds: BiliCredentials, private readonly proxy?: string) {}
+
+  getMyInfo() { return ApiModule.getMyInfo(this.creds, this.proxy); }
+  getMyInfo2() { return ApiModule.getMyInfo2(this.creds, this.proxy); }
+  getSpace(uid: number) { return ApiModule.getSpace(this.creds, uid, this.proxy); }
+  likeVideo(aid: number, like = true) { return ApiModule.likeVideo(this.creds, aid, like, this.proxy); }
+  dislikeVideo(aid: number) { return ApiModule.dislikeVideo(this.creds, aid, this.proxy); }
+  addCoin(aid: number, multiply: 1 | 2 = 1) { return ApiModule.addCoin(this.creds, aid, multiply, this.proxy); }
+  tripleVideo(aid: number) { return ApiModule.tripleVideo(this.creds, aid, this.proxy); }
+  shareVideo(aid: number) { return ApiModule.shareVideo(this.creds, aid, this.proxy); }
+  modifyRelation(uid: number, action: 1 | 2 | 3 | 5 | 6 | 7) { return ApiModule.modifyRelation(this.creds, uid, action, this.proxy); }
+  signManga() { return ApiModule.signManga(this.creds, this.proxy); }
+  addVipExperience() { return ApiModule.addVipExperience(this.creds, this.proxy); }
+  receiveVipPrivilege(type: number) { return ApiModule.receiveVipPrivilege(this.creds, type, this.proxy); }
+  getExpReward() { return ApiModule.getExpReward(this.creds, this.proxy); }
+  reportWatch(aid: number, cid: number, progress?: number) { return ApiModule.reportWatch(this.creds, aid, cid, progress, this.proxy); }
+  replyVideo(aid: number, message: string) { return ApiModule.replyVideo(this.creds, aid, message, this.proxy); }
+  unfavVideo(aid: number) { return ApiModule.unfavVideo(this.creds, aid, this.proxy); }
+  favVideo(aid: number) { return ApiModule.favVideo(this.creds, aid, this.proxy); }
+  getFeed(options?: Parameters<typeof ApiModule.getFeed>[1]) { return ApiModule.getFeed(this.creds, options); }
+  getLiveFeed(options?: Parameters<typeof ApiModule.getLiveFeed>[1]) { return ApiModule.getLiveFeed(this.creds, options); }
 }

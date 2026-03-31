@@ -9,7 +9,7 @@
  */
 
 // 主客户端
-export { BiliBot } from './client.js';
+export { BiliBot, BotLiveFacade, BotVideoFacade, BotApiFacade } from './client.js';
 
 // 多账号管理器
 export { BiliBotManager } from './manager.js';
