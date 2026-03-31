@@ -324,23 +324,20 @@ export async function getLiveRecommend(
   creds: BiliCredentials,
   proxy?: string
 ): Promise<BiliApiResponse<unknown>> {
-  const appHeaders = await buildAppHeaders(creds);
   return fetchRequest<BiliApiResponse<unknown>>({
-    url: 'https://api.live.bilibili.com/xlive/app-interface/v2/index/feed',
+    url: 'https://api.live.bilibili.com/xlive/web-interface/v1/index/getList',
     method: 'GET',
     params: {
-      access_key: creds.access_token,
-      actionKey: 'appkey',
-      appkey: '1d8b6e7d45233436',
-      build: '7750600',
-      channel: 'master',
-      device: 'android',
-      mobi_app: 'android_i',
-      platform: 'android',
-      scale: 'xxhdpi',
-      ts: Math.floor(Date.now() / 1000),
-    } as unknown as Record<string, string | number>,
-    extraHeaders: appHeaders,
+      platform: 'web',
+      parent_area_id: 0,
+      area_id: 0,
+      sort_type: '',
+      page: 1,
+      platform_type: 0,
+      page_size: 30,
+    },
+    needSign: false,
+    extraHeaders: buildWebHeaders(creds),
     proxy,
   });
 }

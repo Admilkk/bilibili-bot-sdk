@@ -281,6 +281,7 @@ export class BotLiveFacade {
   liveShare(roomId: number) {
     return LiveApi.liveShare(this.creds, roomId, this.proxy);
   }
+  getLiveRecommend() { return LiveApi.getLiveRecommend(this.creds, this.proxy); }
 }
 
 /** 视频 API facade，由 {@link BiliBot} 自动创建并绑定凭据。 */
@@ -299,6 +300,8 @@ export class BotVideoFacade {
   searchVideo(keyword: string, options?: Parameters<typeof VideoApi.searchVideo>[2]) {
     return VideoApi.searchVideo(this.creds, keyword, options);
   }
+  getVideoRanking(rid = 0) { return VideoApi.getVideoRanking(rid, this.proxy); }
+  getPopularVideos(pn = 1, ps = 20) { return VideoApi.getPopularVideos(pn, ps, this.proxy); }
 }
 
 /** 通用 REST API facade，由 {@link BiliBot} 自动创建并绑定凭据。 */
